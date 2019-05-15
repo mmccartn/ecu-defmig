@@ -109,6 +109,7 @@ const main = function(args) {
         }
     }
     writeXml(targetOut, args.target)
+    console.info('Matched and saved', targetTables.length, 'definitions to', args.target)
 }
 
 const mapRrToSr = function(rrRom, srRom) {
