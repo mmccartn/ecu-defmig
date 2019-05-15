@@ -14,8 +14,8 @@
   "license": "MIT",
   "dependencies": {
     "argparse": "^1.0.10",
-    "fast-xml-parser": "^3.12.16",
-    "nconf": "^0.10.0"
+    "nconf": "^0.10.0",
+    "xml-js": "^1.6.11"
   },
   "devDependencies": {
     "eslint": "^5.16.0"

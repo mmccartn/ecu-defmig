@@ -2,7 +2,7 @@
 
 const { ArgumentParser } = require('argparse')
 const config = require('./config')
-const parser = require('fast-xml-parser')
+const convert = require('xml-js')
 const fs = require('fs')
 
 const TABLE_IGNORES = new Set(['name', 'storageaddress'])
@@ -12,33 +12,33 @@ const trimHex = function(str) {
     return str[0] === '0' && str[1] === 'x' ? str.substring(2) : str
 }
 
-const comparesRTables = function(tableA, tableB) {
-    if (compareElements(tableA, tableB, TABLE_IGNORES)) {
-        if (compareElements(tableA.scaling, tableB.scaling, SCALE_IGNORES)) {
-            const subTablesA = tableA.table
-            const subTablesB = tableB.table
-            if (!subTablesA && !subTablesB) {
-                return true
-            } else if ((subTablesA && !subTablesB) || (!subTablesA && subTablesB)) {
-                return false
-            } else if ((subTablesA && subTablesB) && subTablesA.length !== subTablesB.length) {
-                return false
-            } else if (!subTablesA.length && !subTablesB.length) {
-                return comparesRTables(subTablesA, subTablesB)
-            } else {
-                for (let idx in subTablesA) {
-                    if (!comparesRTables(subTablesA[idx], subTablesB[idx])) {
-                        return false
-                    }
-                }
-                return true
-            }
-        } else {
+const compareSrTables = function(tableA, tableB) {
+    if (
+        tableA._comment === tableB._comment &&
+        compareElements(tableA, tableB, TABLE_IGNORES) &&
+        compareElements(tableA.scaling, tableB.scaling, SCALE_IGNORES)
+    ) {
+        const subTablesA = tableA.table
+        const subTablesB = tableB.table
+        if (!subTablesA && !subTablesB) { // Neither has sub-tables
+            return true
+        } else if ( // Missmatch
+            ((subTablesA && !subTablesB) || (!subTablesA && subTablesB)) ||
+            ((subTablesA && subTablesB) && subTablesA.length !== subTablesB.length)
+        ) {
             return false
+        } else if (!subTablesA.length && !subTablesB.length) { // Both are objects
+            return compareSrTables(subTablesA, subTablesB)
+        } else { // Both have arrays of sub-tables
+            for (let idx in subTablesA) {
+                if (!compareSrTables(subTablesA[idx], subTablesB[idx])) {
+                    return false
+                }
+            }
+            return true
         }
-    } else {
-        return false
     }
+    return false
 }
 
 const compareElements = function(elementA, elementB, ignore) {
@@ -50,41 +50,30 @@ const compareElements = function(elementA, elementB, ignore) {
     return true
 }
 
-// Not Used
-const compareObjects = function(objA, objB, ignore) {
-    for (let key of Object.keys(objA)) {
-        if (!ignore.has(key) && objB[key] !== objA[key]) {
-            return false
-        }
-    }
-    return true
-}
-
-const test = function(args) {
+const main = function(args) {
     const rrRom = readFirstRom(args.source)
     const srRom = readFirstRom(args.source_sr)
     const srcMap = mapRrToSr(rrRom, srRom)
 
     const targetRom = readFirstRom(args.target_sr)
 
-    // const test = comparesRTables(srRom.table[srcMap[4]], targetRom.table[1287])
+    // const test = compareSrTables(srRom.table[srcMap[4]], targetRom.table[1287])
     // console.info(rrRom.table[4], srRom.table[srcMap[4]], targetRom.table[1287])
     // console.info(test)
     // return
 
     Object.keys(srcMap).forEach(srcIdx => {
-        // TODO: find all tables in targetSrRom that match table and srRom.table[srcMap[idx]]
         const table = rrRom.table[srcIdx]
         const srTable = srRom.table[srcMap[srcIdx]]
         const matches = targetRom.table.filter((tTable, index) => {
-            return comparesRTables(srTable, tTable)
+            return compareSrTables(srTable, tTable)
         })
         if (matches.length === 0) {
             console.warn('No matches found for', table.attr.name)
         } else if (matches.length === 1) {
             console.warn('Matched', table.attr.name, 'to', matches[0].attr.storageaddress)
         } else {
-            // console.info(table.attr.name, matches.length)
+            console.info('Multiple matches for', table.attr.name, matches.length)
         }
     })
 }
@@ -104,10 +93,14 @@ const mapRrToSr = function(rrRom, srRom) {
 
 const readFirstRom = function(filepath) {
     const xmlStr = fs.readFileSync(filepath, { encoding: 'UTF-8' })
-    const defs = parser.parse(xmlStr, {
-        attributeNamePrefix : '',
-        attrNodeName: 'attr',
-        ignoreAttributes: false
+    const defs = convert.xml2js(xmlStr, {
+        attributesKey: 'attr',
+        compact: true,
+        alwaysArray: false,
+        ignoreDeclaration: true,
+        ignoreInstruction: true,
+        ignoreCdata: true,
+        ignoreDoctype: true
     })
     return defs.roms.rom.length ? defs.roms.rom[0] : defs.roms.rom
 }
@@ -131,18 +124,7 @@ if (require.main === module) {
         ['--target-sr'], { help: 'Target ScoobyRom RomRaider XML maps', defaultValue: './data/SR-RR_EA1M511A.xml' }
     )
     const args = parser.parseArgs()
-    const main = () => {
-        console.info(`=== ${config.get('app:name')} ===`)
-        test(args)
-        console.info('~~~ END')
-    }
-    main()
+    console.info(`=== ${config.get('app:name')} ===`)
+    main(args)
+    console.info('~~~ END')
 }
-
-// source:      data/RR_EA1T400W.xml
-// source-sr:   data/SR-RR_EA1T400W.xml
-// target:      data/RR_EA1M511A.xml
-// target-sr:   data/SR-RR_EA1M511A.xml
-
-// Mine: EA1M511A
-// His:  EA1T400W
