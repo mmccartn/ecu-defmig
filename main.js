@@ -62,29 +62,53 @@ const matchSourceToTarget = function(rrRom, srRom, srcMap, targetRom) {
     }, [])
 }
 
+const mergeTables = function(tableA, tableB) {
+    const clone = { ...tableA }
+    clone.attr.storageaddress = trimHex(tableB.attr.storageaddress)
+    if (clone.table && clone.table.length) {
+        for (let idx in clone.table) {
+            clone.table[idx] = mergeTables(clone.table[idx], tableB.table[idx])
+        }
+    }
+    return clone
+}
+
 const main = function(args) {
-    const rrRom = readFirstRom(args.source)
-    const srRom = readFirstRom(args.source_sr)
+    const rrDefs = readXml(args.source)
+    const rrRom = readFirstRom(rrDefs)
+    const srRom = readFirstRom(readXml(args.source_sr))
     const srcMap = mapRrToSr(rrRom, srRom)
-    const targetRom = readFirstRom(args.target_sr)
-    // DEBUG
-    // const test = compareSrTables(srRom.table[srcMap[4]], targetRom.table[1287])
-    // console.info(rrRom.table[4], srRom.table[srcMap[4]], targetRom.table[1287])
-    // console.info(test)
-    // return
+    const targetRom = readFirstRom(readXml(args.target_sr))
+
     const results = matchSourceToTarget(rrRom, srRom, srcMap, targetRom)
-    // DEBUG
-    results.forEach(result => {
-        if (result.matches.length === 0) {
-            console.warn('No matches found for', result.table.attr.name)
+
+    const targetTables = results.reduce((targets, result) => {
+        if (result.matches.length === 1) {
+            targets.push(mergeTables(result.table, result.matches[0]))
         } else if (result.matches.length === 1) {
-            console.warn('Matched', result.table.attr.name, 'to',
-                result.matches[0].attr.storageaddress)
+            console.error('No matches found for', result.table.attr.name)
         } else {
-            console.info('Multiple matches for', result.table.attr.name,
+            console.warn('Multiple matches for', result.table.attr.name,
                 result.matches.map(match => match.attr.storageaddress))
         }
-    })
+        return targets
+    }, [])
+
+    const targetOut = {
+        _declaration: rrDefs._declaration,
+        _comment: rrDefs._comment,
+        roms: {
+            rom: [
+                {
+                    attr: rrRom.attr,
+                    romid: targetRom.romid,
+                    table: targetTables
+                },
+                rrDefs.roms.rom[1]
+            ]
+        }
+    }
+    writeXml(targetOut, args.target)
 }
 
 const mapRrToSr = function(rrRom, srRom) {
@@ -100,17 +124,17 @@ const mapRrToSr = function(rrRom, srRom) {
     }, {})
 }
 
-const readFirstRom = function(filepath) {
+const writeXml = function(obj, filepath) {
+    const xmlStr = convert.js2xml(obj, { attributesKey: 'attr', spaces: 2, compact: true })
+    fs.writeFileSync(filepath, xmlStr.replace(/"\/>/g, '" />'), { encoding: 'UTF-8' })
+}
+
+const readXml = function(filepath) {
     const xmlStr = fs.readFileSync(filepath, { encoding: 'UTF-8' })
-    const defs = convert.xml2js(xmlStr, {
-        attributesKey: 'attr',
-        compact: true,
-        alwaysArray: false,
-        ignoreDeclaration: true,
-        ignoreInstruction: true,
-        ignoreCdata: true,
-        ignoreDoctype: true
-    })
+    return convert.xml2js(xmlStr, { attributesKey: 'attr', compact: true })
+}
+
+const readFirstRom = function(defs) {
     return defs.roms.rom.length ? defs.roms.rom[0] : defs.roms.rom
 }
 
