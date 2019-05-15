@@ -50,30 +50,39 @@ const compareElements = function(elementA, elementB, ignore) {
     return true
 }
 
-const main = function(args) {
-    const rrRom = readFirstRom(args.source)
-    const srRom = readFirstRom(args.source_sr)
-    const srcMap = mapRrToSr(rrRom, srRom)
-
-    const targetRom = readFirstRom(args.target_sr)
-
-    // const test = compareSrTables(srRom.table[srcMap[4]], targetRom.table[1287])
-    // console.info(rrRom.table[4], srRom.table[srcMap[4]], targetRom.table[1287])
-    // console.info(test)
-    // return
-
-    Object.keys(srcMap).forEach(srcIdx => {
+const matchSourceToTarget = function(rrRom, srRom, srcMap, targetRom) {
+    return Object.keys(srcMap).reduce((results, srcIdx) => {
         const table = rrRom.table[srcIdx]
         const srTable = srRom.table[srcMap[srcIdx]]
         const matches = targetRom.table.filter((tTable, index) => {
             return compareSrTables(srTable, tTable)
         })
-        if (matches.length === 0) {
-            console.warn('No matches found for', table.attr.name)
-        } else if (matches.length === 1) {
-            console.warn('Matched', table.attr.name, 'to', matches[0].attr.storageaddress)
+        results.push({ table, matches })
+        return results
+    }, [])
+}
+
+const main = function(args) {
+    const rrRom = readFirstRom(args.source)
+    const srRom = readFirstRom(args.source_sr)
+    const srcMap = mapRrToSr(rrRom, srRom)
+    const targetRom = readFirstRom(args.target_sr)
+    // DEBUG
+    // const test = compareSrTables(srRom.table[srcMap[4]], targetRom.table[1287])
+    // console.info(rrRom.table[4], srRom.table[srcMap[4]], targetRom.table[1287])
+    // console.info(test)
+    // return
+    const results = matchSourceToTarget(rrRom, srRom, srcMap, targetRom)
+    // DEBUG
+    results.forEach(result => {
+        if (result.matches.length === 0) {
+            console.warn('No matches found for', result.table.attr.name)
+        } else if (result.matches.length === 1) {
+            console.warn('Matched', result.table.attr.name, 'to',
+                result.matches[0].attr.storageaddress)
         } else {
-            console.info('Multiple matches for', table.attr.name, matches.length)
+            console.info('Multiple matches for', result.table.attr.name,
+                result.matches.map(match => match.attr.storageaddress))
         }
     })
 }
