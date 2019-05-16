@@ -73,4 +73,4 @@ Optional arguments:
 ```
 
 ## Issues
-Constants are ignored since ScoobyRom only exports 2D and 3D tables.
+2D tables with only a Y-axis are ignored by ScoobyRom, this tool only exports 3D tables and 2D tables along the X-axis.
