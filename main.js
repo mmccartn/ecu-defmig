@@ -12,6 +12,10 @@ const trimHex = function(str) {
     return str[0] === '0' && str[1] === 'x' ? str.substring(2) : str
 }
 
+const padHex = function(str) {
+    return str[0] === '0' && str[1] === 'x' ? str : `0x${str}`
+}
+
 const compareSrTables = function(tableA, tableB) {
     if (
         tableA._comment === tableB._comment &&
@@ -113,6 +117,8 @@ const mapRrToSr = function(rrRom, srRom) {
         })
         if (match !== -1) {
             lookup[idx] = match
+        } else {
+            console.info(table.attr.storageaddress + ',' + table.attr.name)
         }
         return lookup
     }, {})
@@ -132,7 +138,7 @@ const readFirstRom = function(defs) {
     return defs.roms.rom.length ? defs.roms.rom[0] : defs.roms.rom
 }
 
-const main = function(args) {
+const oldMain = function(args) {
     const rrDefs = readXml(args.source)
     const rrRom = readFirstRom(rrDefs)
     const srRom = readFirstRom(readXml(args.source_sr))
@@ -163,6 +169,52 @@ const main = function(args) {
     console.info('Matched and saved', targetTables.length, 'definitions to', args.target)
 }
 
+const readBytes = function(buf, offset, numBytes) {
+    if ((offset + numBytes) > buf.length) {
+        throw RangeError
+    }
+    const value = Buffer.alloc(numBytes)
+    for (let idx = 0; idx < numBytes; idx++) {
+        value[idx] = buf[offset + idx]
+    }
+    return value
+}
+
+const indexOfSingle = function(buf, value) {
+    const offset = buf.indexOf(value)
+    if (offset === -1) {
+        return -1
+    } else if (buf.indexOf(value, value.length + offset) === -1) {
+        return offset
+    } else {
+        return -2
+    }
+}
+
+const main = function(args) {
+    const rrDefs = readXml(args.source)
+    const rrRom = readFirstRom(rrDefs)
+
+    const srcBin = fs.readFileSync(args.source_rom)
+    const targetBin = fs.readFileSync(args.target_rom)
+
+    for (let table of rrRom.table) {
+        const storeAddr = padHex(table.attr.storageaddress)
+        let index = -2
+        for (let len = 0; len < 100; len++) {
+            const mapVals = readBytes(srcBin, parseInt(storeAddr), len)
+            index = indexOfSingle(targetBin, mapVals)
+            if (index === -1) {
+                console.warn('No single address found for', storeAddr, len)
+                break
+            } else if (index !== -2) {
+                console.info(storeAddr, mapVals, len, index.toString(16))
+                break
+            }
+        }
+    }
+}
+
 if (require.main === module) {
     const parser = new ArgumentParser({
         version: config.get('app:version'),
@@ -173,13 +225,10 @@ if (require.main === module) {
         ['--source'], { help: 'Source RomRaider XML definitions', defaultValue: './data/RR_EA1T400W.xml' }
     )
     parser.addArgument(
-        ['--source-sr'], { help: 'Source ScoobyRom RomRaider XML maps', defaultValue: './data/SR-RR_EA1T400W.xml' }
+        ['--source-rom'], { help: 'Source binary ROM file', defaultValue: './roms/EA1T400W.bin' }
     )
     parser.addArgument(
-        ['--target'], { help: 'Target RomRaider XML definitions to generate', defaultValue: './data/RR_EA1M511A.xml' }
-    )
-    parser.addArgument(
-        ['--target-sr'], { help: 'Target ScoobyRom RomRaider XML maps', defaultValue: './data/SR-RR_EA1M511A.xml' }
+        ['--target-rom'], { help: 'Target binary ROM file', defaultValue: './roms/EA1M511A.bin' }
     )
     const args = parser.parseArgs()
     console.info(`=== ${config.get('app:name')} ===`)
