@@ -105,6 +105,33 @@ const constructRom = function(rrDefs, rrRom, targetRom, targetTables) {
     }
 }
 
+const mapRrToSr = function(rrRom, srRom) {
+    return rrRom.table.reduce((lookup, table, idx) => {
+        const storeAddr = trimHex(table.attr.storageaddress)
+        const match = srRom.table.findIndex(entry => {
+            return trimHex(entry.attr.storageaddress) === storeAddr
+        })
+        if (match !== -1) {
+            lookup[idx] = match
+        }
+        return lookup
+    }, {})
+}
+
+const writeXml = function(obj, filepath) {
+    const xmlStr = convert.js2xml(obj, { attributesKey: 'attr', spaces: 2, compact: true })
+    fs.writeFileSync(filepath, xmlStr.replace(/"\/>/g, '" />'), { encoding: 'UTF-8' })
+}
+
+const readXml = function(filepath) {
+    const xmlStr = fs.readFileSync(filepath, { encoding: 'UTF-8' })
+    return convert.xml2js(xmlStr, { attributesKey: 'attr', compact: true })
+}
+
+const readFirstRom = function(defs) {
+    return defs.roms.rom.length ? defs.roms.rom[0] : defs.roms.rom
+}
+
 const main = function(args) {
     const rrDefs = readXml(args.source)
     const rrRom = readFirstRom(rrDefs)
@@ -134,33 +161,6 @@ const main = function(args) {
 
     writeXml(constructRom(rrDefs, rrRom, targetRom, targetTables), args.target)
     console.info('Matched and saved', targetTables.length, 'definitions to', args.target)
-}
-
-const mapRrToSr = function(rrRom, srRom) {
-    return rrRom.table.reduce((lookup, table, idx) => {
-        const storeAddr = trimHex(table.attr.storageaddress)
-        const match = srRom.table.findIndex(entry => {
-            return trimHex(entry.attr.storageaddress) === storeAddr
-        })
-        if (match !== -1) {
-            lookup[idx] = match
-        }
-        return lookup
-    }, {})
-}
-
-const writeXml = function(obj, filepath) {
-    const xmlStr = convert.js2xml(obj, { attributesKey: 'attr', spaces: 2, compact: true })
-    fs.writeFileSync(filepath, xmlStr.replace(/"\/>/g, '" />'), { encoding: 'UTF-8' })
-}
-
-const readXml = function(filepath) {
-    const xmlStr = fs.readFileSync(filepath, { encoding: 'UTF-8' })
-    return convert.xml2js(xmlStr, { attributesKey: 'attr', compact: true })
-}
-
-const readFirstRom = function(defs) {
-    return defs.roms.rom.length ? defs.roms.rom[0] : defs.roms.rom
 }
 
 if (require.main === module) {
