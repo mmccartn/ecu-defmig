@@ -45,6 +45,9 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
       <table type="X Axis" storageaddress="112C10" />
       <table type="Y Axis" storageaddress="112C44" />
     </table>
+    <table name="Front Oxygen Sensor Scaling" storageaddress="125D9C">
+      <table type="Y Axis" storageaddress="127C40" />
+    </table>
     <table name="Front Oxygen Sensor Compensation (Atm. Pressure)" storageaddress="106878">
       <table type="Y Axis" storageaddress="1068B0" />
     </table>
@@ -55,6 +58,10 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
     <table name="CL Fueling Target Compensation B (Load)" storageaddress="115F28" sizey="19" sizex="12">
       <table type="X Axis" storageaddress="115EAC" />
       <table type="Y Axis" storageaddress="115EDC" />
+    </table>
+    <table name="CL Fueling Target Compensation A (ECT)" storageaddress="115B80">
+      <table type="X Axis" storageaddress="10F948" />
+      <table type="Y Axis" storageaddress="115B74" />
     </table>
     <table name="CL to OL Delay A (Atm. Pressure)" storageaddress="111040" sizey="2">
       <table type="Y Axis" storageaddress="1127C4" />
@@ -94,6 +101,22 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
       <table type="X Axis" storageaddress="113780" />
       <table type="Y Axis" storageaddress="1137B0" />
     </table>
+    <table name="Cranking Fuel Injector Pulse Width 1A High (ECT)" storageaddress="114118">
+      <table type="X Axis" storageaddress="10F948" />
+      <table type="Y Axis" storageaddress="114110" />
+    </table>
+    <table name="Cranking Fuel Injector Pulse Width 1A Low (ECT)" storageaddress="1140D0">
+      <table type="X Axis" storageaddress="10F948" />
+      <table type="Y Axis" storageaddress="1140C8" />
+    </table>
+    <table name="Cranking Fuel Injector Pulse Width 2A High (ECT)" storageaddress="114238">
+      <table type="X Axis" storageaddress="10F948" />
+      <table type="Y Axis" storageaddress="114230" />
+    </table>
+    <table name="Cranking Fuel Injector Pulse Width 2A Low (ECT)" storageaddress="1141F0">
+      <table type="X Axis" storageaddress="10F948" />
+      <table type="Y Axis" storageaddress="1141E8" />
+    </table>
     <table name="Cranking Fuel Injector Pulse Width 3A High (ECT)" storageaddress="11232C">
       <table type="X Axis" storageaddress="112300" />
       <table type="Y Axis" storageaddress="112318" />
@@ -119,6 +142,12 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
     <table name="Cranking Fuel IPW Compensation (IAT)" storageaddress="10FC68">
       <table type="Y Axis" storageaddress="111368" />
     </table>
+    <table name="Throttle Tip-in Enrichment A" storageaddress="1115C0">
+      <table type="Y Axis" storageaddress="112D54" />
+    </table>
+    <table name="Throttle Tip-in Enrichment B" storageaddress="11162C">
+      <table type="Y Axis" storageaddress="112DC0" />
+    </table>
     <table name="Tip-in Enrichment Compensation (RPM)" storageaddress="110268">
       <table type="Y Axis" storageaddress="111958" />
     </table>
@@ -127,6 +156,15 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
     </table>
     <table name="Tip-in Enrichment Compensation A (ECT)" storageaddress="1102A1">
       <table type="Y Axis" storageaddress="11105C" />
+    </table>
+    <table name="Tip-in Enrichment Compensation B (ECT)" storageaddress="111650">
+      <table type="Y Axis" storageaddress="11105C" />
+    </table>
+    <table name="Tip-in Enrichment Compensation C (ECT)" storageaddress="111670">
+      <table type="Y Axis" storageaddress="11105C" />
+    </table>
+    <table name="Tip-in Enrichment Compensation D (ECT)" storageaddress="1116B0">
+      <table type="Y Axis" storageaddress="11109C" />
     </table>
     <table name="Tip-in Enrichment Disable Applied Counter Threshold A (ECT)" storageaddress="1102B1">
       <table type="Y Axis" storageaddress="11105C" />
@@ -142,6 +180,18 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
     </table>
     <table name="Min Primary Base Enrichment 1 (Non-Primary OL) " storageaddress="10FCBA">
       <table type="Y Axis" storageaddress="11105C" />
+    </table>
+    <table name="Min Primary Base Enrichment 1 A" storageaddress="112474" sizey="9">
+      <table type="Y Axis" storageaddress="113CCC" />
+    </table>
+    <table name="Min Primary Base Enrichment 1 B" storageaddress="1125C4">
+      <table type="Y Axis" storageaddress="113E20" />
+    </table>
+    <table name="Min Primary Base Enrichment 1 Cruise" storageaddress="1123C0" sizey="9">
+      <table type="Y Axis" storageaddress="113C18" />
+    </table>
+    <table name="Min Primary Base Enrichment 1 Non-Cruise" storageaddress="112524">
+      <table type="Y Axis" storageaddress="113D80" />
     </table>
     <table name="MAF Sensor Scaling" storageaddress="125C40" sizey="48">
       <table type="Y Axis" storageaddress="127A58" />
@@ -198,8 +248,29 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
       <table type="X Axis" storageaddress="11CABC" />
       <table type="Y Axis" storageaddress="11CAF0" />
     </table>
+    <table name="Base Timing Idle (In-Gear)(Above Speed Threshold)" storageaddress="11C058" sizey="2">
+      <table type="Y Axis" storageaddress="11DACC" />
+    </table>
+    <table name="Base Timing Idle (In-Gear)(Below Speed Threshold)" storageaddress="119444">
+      <table type="Y Axis" storageaddress="11AE9C" />
+    </table>
+    <table name="Base Timing Idle (Neutral)" storageaddress="1194A4">
+      <table type="Y Axis" storageaddress="11AEFC" />
+    </table>
     <table name="Base Timing Idle" storageaddress="1194DD">
       <table type="Y Axis" storageaddress="11AAA8" />
+    </table>
+    <table name="Knock Correction Advance Max A" storageaddress="11D5E4" sizex="15" sizey="16">
+      <table type="X Axis" storageaddress="11D568" />
+      <table type="Y Axis" storageaddress="11D5A4" />
+    </table>
+    <table name="Knock Correction Advance Max B" storageaddress="11D750" sizex="15" sizey="16">
+      <table type="X Axis" storageaddress="11D6D4" />
+      <table type="Y Axis" storageaddress="11D710" />
+    </table>
+    <table name="Knock Correction Advance Max C" storageaddress="11D8BC" sizex="15" sizey="16">
+      <table type="X Axis" storageaddress="11D840" />
+      <table type="Y Axis" storageaddress="11D87C" />
     </table>
     <table name="Timing Compensation (IAT)" storageaddress="119778">
       <table type="Y Axis" storageaddress="11B1B4" />
@@ -208,9 +279,29 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
       <table type="X Axis" storageaddress="11CBD0" />
       <table type="Y Axis" storageaddress="11CBD8" />
     </table>
+    <table name="Timing Compensation Imm. Cruise A (ECT)" storageaddress="119728">
+      <table type="Y Axis" storageaddress="11AAA8" />
+    </table>
+    <table name="Timing Compensation Imm. Cruise B (ECT)" storageaddress="119718">
+      <table type="Y Axis" storageaddress="11AAA8" />
+    </table>
+    <table name="Timing Compensation Imm. Non-Cruise A (ECT)" storageaddress="119708">
+      <table type="Y Axis" storageaddress="11AAA8" />
+    </table>
+    <table name="Timing Compensation Imm. Non-Cruise B (ECT)" storageaddress="1196F8">
+      <table type="Y Axis" storageaddress="11AAA8" />
+    </table>
     <table name="Timing Compensation Per Cylinder A" storageaddress="11D2DC" sizey="7">
       <table type="X Axis" storageaddress="11D288" />
       <table type="Y Axis" storageaddress="11D2C0" />
+    </table>
+    <table name="Timing Compensation Per Cylinder B" storageaddress="11D394" sizey="7">
+      <table type="X Axis" storageaddress="11D340" />
+      <table type="Y Axis" storageaddress="11D378" />
+    </table>
+    <table name="Timing Compensation Per Cylinder C" storageaddress="11D44C" sizey="7">
+      <table type="X Axis" storageaddress="11D3F8" />
+      <table type="Y Axis" storageaddress="11D430" />
     </table>
     <table name="Timing Compensation Per Cylinder D" storageaddress="11D504" sizey="7">
       <table type="X Axis" storageaddress="11D4B0" />
@@ -243,6 +334,34 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
       <table type="X Axis" storageaddress="1275F4" />
       <table type="Y Axis" storageaddress="127630" />
     </table>
+    <table name="Exhaust Cam Retard Angle (AVCS) B " storageaddress="1278CC" sizex="15" sizey="16">
+      <table type="X Axis" storageaddress="127850" />
+      <table type="Y Axis" storageaddress="12788C" />
+    </table>
+    <table name="Exhaust Cam Retard Angle (AVCS) C " storageaddress="127B28" sizex="15" sizey="16">
+      <table type="X Axis" storageaddress="127AAC" />
+      <table type="Y Axis" storageaddress="127AE8" />
+    </table>
+    <table name="Exhaust Cam Retard Angle (AVCS) D " storageaddress="127D84" sizex="15" sizey="16">
+      <table type="X Axis" storageaddress="127D08" />
+      <table type="Y Axis" storageaddress="127D44" />
+    </table>
+    <table name="Exhaust Cam Retard Angle (AVCS) E " storageaddress="127FE0" sizex="15" sizey="16">
+      <table type="X Axis" storageaddress="127F64" />
+      <table type="Y Axis" storageaddress="127FA0" />
+    </table>
+    <table name="Requested Torque (Accelerator Pedal) SI-DRIVE Sport" storageaddress="104038" sizex="17" sizey="20">
+      <table type="X Axis" storageaddress="103FA4" />
+      <table type="Y Axis" storageaddress="103FE8" />
+    </table>
+    <table name="Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp" storageaddress="104374" sizex="17" sizey="20">
+      <table type="X Axis" storageaddress="1042E0" />
+      <table type="Y Axis" storageaddress="104324" />
+    </table>
+    <table name="Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent" storageaddress="1046B0" sizex="17" sizey="20">
+      <table type="X Axis" storageaddress="10461C" />
+      <table type="Y Axis" storageaddress="104660" />
+    </table>
     <table name="Target Throttle Plate Position A (Requested Torque)" storageaddress="13CB10" sizex="48" sizey="12">
       <table type="X Axis" storageaddress="13CA20" />
       <table type="Y Axis" storageaddress="13CAE0" />
@@ -261,7 +380,19 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
     <table name="Coolant Temp Sensor Scaling" storageaddress="1258A8">
       <table type="Y Axis" storageaddress="127710" />
     </table>
+    <table name="Idle Speed Target A" storageaddress="121148">
+      <table type="Y Axis" storageaddress="122310" />
+    </table>
+    <table name="Idle Speed Target B" storageaddress="121168">
+      <table type="Y Axis" storageaddress="122310" />
+    </table>
+    <table name="Idle Speed Target C" storageaddress="121188">
+      <table type="Y Axis" storageaddress="122310" />
+    </table>
     <table name="Idle Speed Target D" storageaddress="1211A8">
+      <table type="Y Axis" storageaddress="122310" />
+    </table>
+    <table name="Idle Speed Target E" storageaddress="1211C8">
       <table type="Y Axis" storageaddress="122310" />
     </table>
     <table name="Idle Speed Target F" storageaddress="1211E8">

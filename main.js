@@ -54,7 +54,7 @@ const matchSourceToTarget = function(rrRom, srRom, srcMap, targetRom) {
     return Object.keys(srcMap).reduce((results, srcIdx) => {
         const table = rrRom.table[srcIdx]
         const srTable = srRom.table[srcMap[srcIdx]]
-        const matches = targetRom.table.filter((tTable, index) => {
+        const matches = targetRom.table.filter(tTable => {
             return compareSrTables(srTable, tTable)
         })
         results.push({ table, matches })
@@ -71,6 +71,38 @@ const mergeTables = function(tableA, tableB) {
         }
     }
     return clone
+}
+
+const matchMultipleByOrder = function(srRom, srcMap, rrRom, rrTable, matches) {
+    const srTable = srRom.table[srcMap[rrRom.table.indexOf(rrTable)]]
+    const srcOrder = srRom.table.filter(table => {
+        return compareSrTables(srTable, table)
+    })
+    if (matches.length === srcOrder.length) {
+        return matches[
+            srcOrder.map(match => trimHex(match.attr.storageaddress))
+                .indexOf(rrTable.attr.storageaddress)
+        ]
+    } else {
+        return false
+    }
+}
+
+const constructRom = function(rrDefs, rrRom, targetRom, targetTables) {
+    return {
+        _declaration: rrDefs._declaration,
+        _comment: rrDefs._comment,
+        roms: {
+            rom: [
+                {
+                    attr: rrRom.attr,
+                    romid: targetRom.romid,
+                    table: targetTables
+                },
+                rrDefs.roms.rom[1]
+            ]
+        }
+    }
 }
 
 const main = function(args) {
@@ -90,25 +122,17 @@ const main = function(args) {
         } else {
             console.warn('Multiple matches for', result.table.attr.name,
                 result.matches.map(match => match.attr.storageaddress))
+            const match = matchMultipleByOrder(srRom, srcMap, rrRom, result.table, result.matches)
+            if (match) {
+                targets.push(mergeTables(result.table, match))
+            } else {
+                console.warn('* Could not find matching table from multiple choice by order')
+            }
         }
         return targets
     }, [])
 
-    const targetOut = {
-        _declaration: rrDefs._declaration,
-        _comment: rrDefs._comment,
-        roms: {
-            rom: [
-                {
-                    attr: rrRom.attr,
-                    romid: targetRom.romid,
-                    table: targetTables
-                },
-                rrDefs.roms.rom[1]
-            ]
-        }
-    }
-    writeXml(targetOut, args.target)
+    writeXml(constructRom(rrDefs, rrRom, targetRom, targetTables), args.target)
     console.info('Matched and saved', targetTables.length, 'definitions to', args.target)
 }
 
