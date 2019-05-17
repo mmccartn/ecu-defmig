@@ -5,6 +5,7 @@ const config = require('./config')
 const convert = require('xml-js')
 const fs = require('fs')
 
+const LENGTH_LIMIT = 4096
 const TABLE_IGNORES = new Set(['name', 'storageaddress'])
 const SCALE_IGNORES = new Set()
 
@@ -92,7 +93,7 @@ const matchMultipleByOrder = function(srRom, srcMap, rrRom, rrTable, matches) {
     }
 }
 
-const constructRom = function(rrDefs, rrRom, targetRom, targetTables) {
+const constructRom = function(rrDefs, rrRom, targetTables) {
     return {
         _declaration: rrDefs._declaration,
         _comment: rrDefs._comment,
@@ -100,28 +101,13 @@ const constructRom = function(rrDefs, rrRom, targetRom, targetTables) {
             rom: [
                 {
                     attr: rrRom.attr,
-                    romid: targetRom.romid,
+                    romid: rrRom.romid,
                     table: targetTables
                 },
                 rrDefs.roms.rom[1]
             ]
         }
     }
-}
-
-const mapRrToSr = function(rrRom, srRom) {
-    return rrRom.table.reduce((lookup, table, idx) => {
-        const storeAddr = trimHex(table.attr.storageaddress)
-        const match = srRom.table.findIndex(entry => {
-            return trimHex(entry.attr.storageaddress) === storeAddr
-        })
-        if (match !== -1) {
-            lookup[idx] = match
-        } else {
-            console.info(table.attr.storageaddress + ',' + table.attr.name)
-        }
-        return lookup
-    }, {})
 }
 
 const writeXml = function(obj, filepath) {
@@ -191,6 +177,40 @@ const indexOfSingle = function(buf, value) {
     }
 }
 
+const indexOfAll = function(buf, value) {
+    const matches = []
+    let offset = buf.indexOf(value)
+    while (offset !== -1) {
+        matches.push(offset)
+        offset = buf.indexOf(value, offset + value.length)
+    }
+    return matches
+}
+
+const matchBins = function(addr, srcBin, targetBin) {
+    const addrInt = parseInt(padHex(addr))
+    let result = { matches: [], len: LENGTH_LIMIT }
+    let index = -2
+    for (let len = 0; len < LENGTH_LIMIT; len++) {
+        const mapVals = readBytes(srcBin, addrInt, len)
+        index = indexOfSingle(targetBin, mapVals)
+        if (index === -1) {
+            const targetMatches = indexOfAll(targetBin, readBytes(srcBin, addrInt, len - 1))
+            console.warn(
+                `Multiple matchs found from 0x${addr}+${len - 1}`,
+                `[${targetMatches.length}]`
+            )
+            result = { matches: targetMatches, len: len - 1 }
+            break
+        } else if (index !== -2) {
+            console.info(`Matched 0x${addr} to 0x${index.toString(16)}+${len}`)
+            result = { matches: [index], len }
+            break
+        }
+    }
+    return result
+}
+
 const main = function(args) {
     const rrDefs = readXml(args.source)
     const rrRom = readFirstRom(rrDefs)
@@ -198,21 +218,33 @@ const main = function(args) {
     const srcBin = fs.readFileSync(args.source_rom)
     const targetBin = fs.readFileSync(args.target_rom)
 
-    for (let table of rrRom.table) {
-        const storeAddr = padHex(table.attr.storageaddress)
-        let index = -2
-        for (let len = 0; len < 100; len++) {
-            const mapVals = readBytes(srcBin, parseInt(storeAddr), len)
-            index = indexOfSingle(targetBin, mapVals)
-            if (index === -1) {
-                console.warn('No single address found for', storeAddr, len)
-                break
-            } else if (index !== -2) {
-                console.info(storeAddr, mapVals, len, index.toString(16))
-                break
+    const matchMap = rrRom.table.reduce((acc, table) => {
+        const addr = table.attr.storageaddress
+        acc[addr] = matchBins(addr, srcBin, targetBin)
+        return acc
+    }, {})
+
+    const targetTables = rrRom.table.reduce((acc, table) => {
+        const targetTable = { ...table }
+        const srcAddr = table.attr.storageaddress
+        const match = matchMap[srcAddr]
+        if (match.matches.length === 1) {
+            const targetAddr = match.matches[0]
+            targetTable.attr.storageaddress = targetAddr.toString(16).toUpperCase()
+            if (targetTable.table) {
+                targetTable.table = targetTable.table.length ? targetTable.table : [targetTable.table]
+                targetTable.table.forEach(subTable => {
+                    const subAddr = subTable.attr.storageaddress
+                    const corrected = (parseInt(padHex(subAddr)) - parseInt(padHex(srcAddr))) + targetAddr
+                    subTable.attr.storageaddress = corrected.toString(16).toUpperCase()
+                })
             }
+            acc.push(targetTable)
         }
-    }
+        return acc
+    }, [])
+
+    writeXml(constructRom(rrDefs, rrRom, targetTables), args.target)
 }
 
 if (require.main === module) {
@@ -229,6 +261,9 @@ if (require.main === module) {
     )
     parser.addArgument(
         ['--target-rom'], { help: 'Target binary ROM file', defaultValue: './roms/EA1M511A.bin' }
+    )
+    parser.addArgument(
+        ['--target'], { help: 'Target RomRaider XML definitions', defaultValue: './data/RR_EA1M511A.xml' }
     )
     const args = parser.parseArgs()
     console.info(`=== ${config.get('app:name')} ===`)
