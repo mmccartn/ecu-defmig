@@ -5,7 +5,7 @@ const config = require('./config')
 const convert = require('xml-js')
 const fs = require('fs')
 
-const LENGTH_LIMIT = 4096
+const LENGTH_LIMIT = 1024
 const TABLE_IGNORES = new Set(['name', 'storageaddress'])
 const SCALE_IGNORES = new Set()
 
@@ -181,56 +181,30 @@ const indexOfSingle = function(buf, value, start = 0) {
     }
 }
 
-const indexOfAll = function(buf, value, start = 0) {
-    const matches = []
-    let offset = buf.indexOf(value, start)
-    while (offset !== -1) {
-        matches.push(offset)
-        offset = buf.indexOf(value, offset + value.length + start)
-    }
-    return matches
-}
-
-// shortestUniqueWindow(parseInt(padHex(addr)), ...
-const shortestUniqueWindow = function(key, start, len, bufA, bufB) {
+const shortestUniqueWindow = function(key, start, len, bufA, bufB, tried) {
     const word = readBytes(bufA, start, len)
-    let index = indexOfSingle(bufB, word)
-    if (index === -1) {
-        return { match: -1, len: Infinity, start: 0 }
-    } else if (index !== -2) {
-        return { match: index + (addr - start), len, start }
-    } else {
-        const recurse = [
-            shortestUniqueWindow(key, start - 0, len + 1, bufA, bufB, limit),
-            shortestUniqueWindow(key, start - 1, len + 0, bufA, bufB, limit),
-            shortestUniqueWindow(key, start - 1, len + 1, bufA, bufB, limit)
-        ].filter(res => res.match > -1).sort((a, b) => a.len - b.len)
-        return recurse.length ? recurse[0] : { match: -3, len: Infinity, start: 0 }
-    }
-}
-
-const matchBins = function(addr, srcBin, targetBin, offset = 0) {
-    const addrInt = parseInt(padHex(addr))
-    let result = { matches: [], len: LENGTH_LIMIT }
-    let index = -2
-    for (let len = 0; len < LENGTH_LIMIT; len++) {
-        const mapVals = readBytes(srcBin, addrInt, len)
-        index = indexOfSingle(targetBin, mapVals, offset)
-        if (index === -1) {
-            const targetMatches = indexOfAll(targetBin, readBytes(srcBin, addrInt, len - 1), offset)
-            console.warn(
-                `Multiple matchs found from 0x${addr}+${len - 1}`,
-                `[${targetMatches.length}]`
-            )
-            result = { matches: targetMatches, len: len - 1 }
-            break
-        } else if (index !== -2) {
-            console.info(`Matched 0x${addr} to 0x${index.toString(16)}+${len}`)
-            result = { matches: [index], len }
-            break
+    tried.add(String([start, len]))
+    const index = indexOfSingle(bufB, word)
+    if (index === -1) { // found no match
+        return { match: -1, len: Infinity, offset: 0 }
+    } else if (index !== -2) { // found unique match
+        return { match: index + (key - start), len, offset: (key - start) }
+    } else if (len >= LENGTH_LIMIT) { // search depth limit
+        return { match: -4, len, offset: 0 }
+    } else { // found match, but not unique
+        const recurse = []
+        if (!tried.has(String([start - 0, len + 1]))) { // fwd
+            recurse.push(shortestUniqueWindow(key, start - 0, len + 1, bufA, bufB, tried))
         }
+        if (!tried.has(String([start - 1, len + 1]))) { // bwd
+            recurse.push(shortestUniqueWindow(key, start - 1, len + 1, bufA, bufB, tried))
+        }
+        if (!tried.has(String([start - 1, len + 2]))) { // bid
+            recurse.push(shortestUniqueWindow(key, start - 1, len + 2, bufA, bufB, tried))
+        }
+        const best = recurse.filter(res => res.match > -1).sort((a, b) => a.len - b.len)
+        return best.length ? best[0] : { match: -3, len: Infinity, offset: 0 }
     }
-    return result
 }
 
 const main = function(args) {
@@ -240,42 +214,36 @@ const main = function(args) {
     const srcBin = fs.readFileSync(args.source_rom)
     const targetBin = fs.readFileSync(args.target_rom)
 
+    // Find the shortest unique matching address range in the target bin for all
+    // known source address
     const matchMap = rrRom.table.reduce((acc, table) => {
-        const rootAddr = table.attr.storageaddress
-        acc[rootAddr] = matchBins(rootAddr, srcBin, targetBin)
-        if (acc[rootAddr].matches.length === 1) {
-            const lastIndex = acc[rootAddr].matches[0]
-            if (table.table && table.table.length) {
-                table.table.forEach(subTable => {
-                    const subAddr = subTable.attr.storageaddress
-                    acc[subAddr] = matchBins(subAddr, srcBin, targetBin, lastIndex)
-                })
-            } else if (table.table) {
-                const subAddr = table.table.attr.storageaddress
-                acc[subAddr] = matchBins(subAddr, srcBin, targetBin, lastIndex)
-            }
-        }
+        const addr = table.attr.storageaddress
+        const addrInt = parseInt(padHex(addr))
+        const window = shortestUniqueWindow(addrInt, addrInt, 1, srcBin, targetBin, new Set())
+        acc[addr] = window
+        console.info( // DEBUG
+            'Matched:',
+            `(0x${addr}, 0x${window.match.toString(16).toUpperCase()}) -`,
+            `[${window.offset}:${window.len}:${window.len - window.offset}]`
+        )
         return acc
     }, {})
 
     const targetTables = rrRom.table.reduce((acc, table) => {
         const targetTable = { ...table }
         const srcAddr = table.attr.storageaddress
-        const match = matchMap[srcAddr]
-        if (match.matches.length === 1) {
-            const targetAddr = match.matches[0]
+        const window = matchMap[srcAddr]
+        const targetAddr = window.match
+        if (targetAddr > -1) {
             targetTable.attr.storageaddress = targetAddr.toString(16).toUpperCase()
             if (targetTable.table) {
                 targetTable.table = targetTable.table.length ? targetTable.table : [targetTable.table]
                 targetTable.table.forEach(subTable => {
-                    const subAddr = subTable.attr.storageaddress
-                    const subMatch = matchMap[subAddr]
-                    if (match.matches.length === 1) {
-                        const subTargetAddr = subMatch.matches[0]
-                        subTable.attr.storageaddress = subTargetAddr.toString(16).toUpperCase()
-                    } else {
-                        subTable.attr.storageaddress = '0x00'
-                    }
+                    const subSrcAddr = parseInt(padHex(subTable.attr.storageaddress))
+                    const srcAddrInt = parseInt(padHex(srcAddr))
+                    subTable.attr.storageaddress = (
+                        targetAddr - (srcAddrInt - subSrcAddr)
+                    ).toString(16).toUpperCase()
                 })
             }
             acc.push(targetTable)
