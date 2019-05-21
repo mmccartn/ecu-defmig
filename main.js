@@ -166,36 +166,36 @@ const readBytes = function(buf, offset, numBytes) {
     return value
 }
 
-const indexOfSingle = function(buf, value) {
-    const offset = buf.indexOf(value)
+const indexOfSingle = function(buf, value, start = 0) {
+    const offset = buf.indexOf(value, start)
     if (offset === -1) {
         return -1
-    } else if (buf.indexOf(value, value.length + offset) === -1) {
+    } else if (buf.indexOf(value, value.length + offset + start) === -1) {
         return offset
     } else {
         return -2
     }
 }
 
-const indexOfAll = function(buf, value) {
+const indexOfAll = function(buf, value, start = 0) {
     const matches = []
-    let offset = buf.indexOf(value)
+    let offset = buf.indexOf(value, start)
     while (offset !== -1) {
         matches.push(offset)
-        offset = buf.indexOf(value, offset + value.length)
+        offset = buf.indexOf(value, offset + value.length + start)
     }
     return matches
 }
 
-const matchBins = function(addr, srcBin, targetBin) {
+const matchBins = function(addr, srcBin, targetBin, offset = 0) {
     const addrInt = parseInt(padHex(addr))
     let result = { matches: [], len: LENGTH_LIMIT }
     let index = -2
     for (let len = 0; len < LENGTH_LIMIT; len++) {
         const mapVals = readBytes(srcBin, addrInt, len)
-        index = indexOfSingle(targetBin, mapVals)
+        index = indexOfSingle(targetBin, mapVals, offset)
         if (index === -1) {
-            const targetMatches = indexOfAll(targetBin, readBytes(srcBin, addrInt, len - 1))
+            const targetMatches = indexOfAll(targetBin, readBytes(srcBin, addrInt, len - 1), offset)
             console.warn(
                 `Multiple matchs found from 0x${addr}+${len - 1}`,
                 `[${targetMatches.length}]`
@@ -219,8 +219,20 @@ const main = function(args) {
     const targetBin = fs.readFileSync(args.target_rom)
 
     const matchMap = rrRom.table.reduce((acc, table) => {
-        const addr = table.attr.storageaddress
-        acc[addr] = matchBins(addr, srcBin, targetBin)
+        const rootAddr = table.attr.storageaddress
+        acc[rootAddr] = matchBins(rootAddr, srcBin, targetBin)
+        if (acc[rootAddr].matches.length === 1) {
+            const lastIndex = acc[rootAddr].matches[0]
+            if (table.table && table.table.length) {
+                table.table.forEach(subTable => {
+                    const subAddr = subTable.attr.storageaddress
+                    acc[subAddr] = matchBins(subAddr, srcBin, targetBin, lastIndex)
+                })
+            } else if (table.table) {
+                const subAddr = table.table.attr.storageaddress
+                acc[subAddr] = matchBins(subAddr, srcBin, targetBin, lastIndex)
+            }
+        }
         return acc
     }, {})
 
@@ -235,8 +247,13 @@ const main = function(args) {
                 targetTable.table = targetTable.table.length ? targetTable.table : [targetTable.table]
                 targetTable.table.forEach(subTable => {
                     const subAddr = subTable.attr.storageaddress
-                    const corrected = (parseInt(padHex(subAddr)) - parseInt(padHex(srcAddr))) + targetAddr
-                    subTable.attr.storageaddress = corrected.toString(16).toUpperCase()
+                    const subMatch = matchMap[subAddr]
+                    if (match.matches.length === 1) {
+                        const subTargetAddr = subMatch.matches[0]
+                        subTable.attr.storageaddress = subTargetAddr.toString(16).toUpperCase()
+                    } else {
+                        subTable.attr.storageaddress = '0x00'
+                    }
                 })
             }
             acc.push(targetTable)
