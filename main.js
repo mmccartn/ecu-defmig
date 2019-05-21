@@ -65,7 +65,9 @@ const matchSourceToTarget = function(rrRom, srRom, srcMap, targetRom) {
 const mergeTables = function(tableA, tableB) {
     const clone = { ...tableA }
     clone.attr.storageaddress = trimHex(tableB.attr.storageaddress)
-    if (clone.table && clone.table.length) {
+    if (clone.table && tableB.table) {
+        clone.table = clone.table.length ? clone.table : [clone.table]
+        tableB.table = tableB.table.length ? tableB.table : [tableB.table]
         for (let idx in clone.table) {
             clone.table[idx] = mergeTables(clone.table[idx], tableB.table[idx])
         }
