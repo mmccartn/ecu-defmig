@@ -166,6 +166,10 @@ const readBytes = function(buf, offset, numBytes) {
     return value
 }
 
+// Returns:
+// -1: value not found in buf
+// -2: value found at least 2 times in buf
+// 0+: index of value in buf
 const indexOfSingle = function(buf, value, start = 0) {
     const offset = buf.indexOf(value, start)
     if (offset === -1) {
@@ -185,6 +189,24 @@ const indexOfAll = function(buf, value, start = 0) {
         offset = buf.indexOf(value, offset + value.length + start)
     }
     return matches
+}
+
+// shortestUniqueWindow(parseInt(padHex(addr)), ...
+const shortestUniqueWindow = function(key, start, len, bufA, bufB) {
+    const word = readBytes(bufA, start, len)
+    let index = indexOfSingle(bufB, word)
+    if (index === -1) {
+        return { match: -1, len: Infinity, start: 0 }
+    } else if (index !== -2) {
+        return { match: index + (addr - start), len, start }
+    } else {
+        const recurse = [
+            shortestUniqueWindow(key, start - 0, len + 1, bufA, bufB, limit),
+            shortestUniqueWindow(key, start - 1, len + 0, bufA, bufB, limit),
+            shortestUniqueWindow(key, start - 1, len + 1, bufA, bufB, limit)
+        ].filter(res => res.match > -1).sort((a, b) => a.len - b.len)
+        return recurse.length ? recurse[0] : { match: -3, len: Infinity, start: 0 }
+    }
 }
 
 const matchBins = function(addr, srcBin, targetBin, offset = 0) {
