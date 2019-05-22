@@ -184,7 +184,6 @@ const indexOfSingle = function(buf, value, start = 0) {
 }
 
 const shortestUniqueWindow = function(key, start, len, bufA, bufB, tried, limit = LENGTH_LIMIT) {
-    count++
     const word = readBytes(bufA, start, len)
     tried.add(`${start},${len}`)
     const index = indexOfSingle(bufB, word)
