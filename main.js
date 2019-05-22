@@ -211,6 +211,27 @@ const shortestUniqueWindow = function(key, start, len, bufA, bufB, tried, limit 
     }
 }
 
+const shortestUniqueWindowHelper = function(table, bufA, bufB, verbose = true) {
+    const addr = table.attr.storageaddress
+    const addrInt = parseInt(padHex(addr))
+    const window = shortestUniqueWindow(addrInt, addrInt, 1, bufA, bufB, new Set())
+    if (verbose) {
+        console.info( // DEBUG
+            'Matched:',
+            `(0x${addr}, 0x${window.match.toString(16).toUpperCase()}) -`,
+            `[${window.offset}:${window.len}:${window.len - window.offset}]`
+        )
+    }
+    return window
+}
+
+const matchSubTables = function(rootTable, matchMap, bufA, bufB) {
+    const tables = rootTable.length ? rootTable : [rootTable]
+    for (let table of tables) {
+        matchMap[table.attr.storageaddress] = shortestUniqueWindowHelper(table, bufA, bufB)
+    }
+}
+
 const main = function(args) {
     const rrDefs = readXml(args.source)
     const rrRom = readFirstRom(rrDefs)
@@ -222,15 +243,11 @@ const main = function(args) {
     // known source address
     const matchMap = {}
     for (let table of rrRom.table) {
-        const addr = table.attr.storageaddress
-        const addrInt = parseInt(padHex(addr))
-        const window = shortestUniqueWindow(addrInt, addrInt, 1, srcBin, targetBin, new Set())
-        matchMap[addr] = window
-        console.info( // DEBUG
-            'Matched:',
-            `(0x${addr}, 0x${window.match.toString(16).toUpperCase()}) -`,
-            `[${window.offset}:${window.len}:${window.len - window.offset}]`
-        )
+        const window = shortestUniqueWindowHelper(table, srcBin, targetBin)
+        matchMap[table.attr.storageaddress] = window
+        if (window.match > -1 && table.table) {
+            matchSubTables(table.table, matchMap, srcBin, targetBin)
+        }
     }
 
     const targetTables = rrRom.table.reduce((acc, table) => {
@@ -243,11 +260,8 @@ const main = function(args) {
             if (targetTable.table) {
                 targetTable.table = targetTable.table.length ? targetTable.table : [targetTable.table]
                 targetTable.table.forEach(subTable => {
-                    const subSrcAddr = parseInt(padHex(subTable.attr.storageaddress))
-                    const srcAddrInt = parseInt(padHex(srcAddr))
-                    subTable.attr.storageaddress = (
-                        targetAddr - (srcAddrInt - subSrcAddr)
-                    ).toString(16).toUpperCase()
+                    const subSrcAddr = subTable.attr.storageaddress
+                    subTable.attr.storageaddress = matchMap[subSrcAddr].match.toString(16).toUpperCase()
                 })
             }
             acc.push(targetTable)
