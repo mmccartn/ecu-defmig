@@ -23,10 +23,10 @@ for any damage or injury incurred as a result of these definitions. USE AT YOUR 
 <roms>
   <rom base="32BITBASE">
     <romid>
-      <xmlid/>
-      <internalidaddress>EA1M511A</internalidaddress>
+      <xmlid>EA1M511A</xmlid>
       <internalidaddress>8000</internalidaddress>
-      <ecuid>EA1M511A</ecuid>
+      <internalidstring>EA1M511A</internalidstring>
+      <ecuid></ecuid>
       <year>14</year>
       <market>USDM</market>
       <make>Subaru</make>
