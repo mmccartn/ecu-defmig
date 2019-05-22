@@ -183,29 +183,32 @@ const indexOfSingle = function(buf, value, start = 0) {
     }
 }
 
-const shortestUniqueWindow = function(key, start, len, bufA, bufB, tried) {
+const shortestUniqueWindow = function(key, start, len, bufA, bufB, tried, limit = LENGTH_LIMIT) {
+    count++
     const word = readBytes(bufA, start, len)
-    tried.add(String([start, len]))
+    tried.add(`${start},${len}`)
     const index = indexOfSingle(bufB, word)
     if (index === -1) { // found no match
         return { match: -1, len: Infinity, offset: 0 }
     } else if (index !== -2) { // found unique match
         return { match: index + (key - start), len, offset: (key - start) }
-    } else if (len >= LENGTH_LIMIT) { // search depth limit
+    } else if (len >= limit) { // search depth limit
         return { match: -4, len, offset: 0 }
     } else { // found match, but not unique
-        const recurse = []
-        if (!tried.has(String([start - 0, len + 1]))) { // fwd
-            recurse.push(shortestUniqueWindow(key, start - 0, len + 1, bufA, bufB, tried))
+        let best = { match: -3, len: Infinity, offset: 0 }
+        if (!tried.has(`${start - 1},${len + 1}`)) { // bwd
+            const win = shortestUniqueWindow(key, start - 1, len + 1, bufA, bufB, tried, limit)
+            best = win.match > -1 ? win : best
         }
-        if (!tried.has(String([start - 1, len + 1]))) { // bwd
-            recurse.push(shortestUniqueWindow(key, start - 1, len + 1, bufA, bufB, tried))
+        if (!tried.has(`${start - 0},${len + 1}`)) { // fwd
+            const win = shortestUniqueWindow(key, start - 0, len + 1, bufA, bufB, tried, Math.min(limit, best.len))
+            best = win.match > -1 && win.len < best.len ? win : best
         }
-        if (!tried.has(String([start - 1, len + 2]))) { // bid
-            recurse.push(shortestUniqueWindow(key, start - 1, len + 2, bufA, bufB, tried))
+        if (!tried.has(`${start - 1},${len + 2}`)) { // bid
+            const win = shortestUniqueWindow(key, start - 1, len + 2, bufA, bufB, tried, Math.min(limit, best.len))
+            best = win.match > -1 && win.len < best.len ? win : best
         }
-        const best = recurse.filter(res => res.match > -1).sort((a, b) => a.len - b.len)
-        return best.length ? best[0] : { match: -3, len: Infinity, offset: 0 }
+        return best
     }
 }
 
@@ -218,18 +221,18 @@ const main = function(args) {
 
     // Find the shortest unique matching address range in the target bin for all
     // known source address
-    const matchMap = rrRom.table.reduce((acc, table) => {
+    const matchMap = {}
+    for (let table of rrRom.table) {
         const addr = table.attr.storageaddress
         const addrInt = parseInt(padHex(addr))
         const window = shortestUniqueWindow(addrInt, addrInt, 1, srcBin, targetBin, new Set())
-        acc[addr] = window
+        matchMap[addr] = window
         console.info( // DEBUG
             'Matched:',
             `(0x${addr}, 0x${window.match.toString(16).toUpperCase()}) -`,
             `[${window.offset}:${window.len}:${window.len - window.offset}]`
         )
-        return acc
-    }, {})
+    }
 
     const targetTables = rrRom.table.reduce((acc, table) => {
         const targetTable = { ...table }
