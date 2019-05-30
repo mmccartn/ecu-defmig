@@ -55,6 +55,19 @@ const compareElements = function(elementA, elementB, ignore) {
     return true
 }
 
+const mapRrToSr = function(rrRom, srRom) {
+    return rrRom.table.reduce((lookup, table, idx) => {
+        const storeAddr = trimHex(table.attr.storageaddress)
+        const match = srRom.table.findIndex(entry => {
+            return trimHex(entry.attr.storageaddress) === storeAddr
+        })
+        if (match !== -1) {
+            lookup[idx] = match
+        }
+        return lookup
+    }, {})
+}
+
 const matchSourceToTarget = function(rrRom, srRom, srcMap, targetRom) {
     return Object.keys(srcMap).reduce((results, srcIdx) => {
         const table = rrRom.table[srcIdx]
@@ -126,16 +139,11 @@ const readFirstRom = function(defs) {
     return defs.roms.rom.length ? defs.roms.rom[0] : defs.roms.rom
 }
 
-const oldMain = function(args) {
-    const rrDefs = readXml(args.source)
-    const rrRom = readFirstRom(rrDefs)
-    const srRom = readFirstRom(readXml(args.source_sr))
+const compareScoobyRomTables = function(rrRom, srRom, targetRom) {
     const srcMap = mapRrToSr(rrRom, srRom)
-    const targetRom = readFirstRom(readXml(args.target_sr))
-
     const results = matchSourceToTarget(rrRom, srRom, srcMap, targetRom)
 
-    const targetTables = results.reduce((targets, result) => {
+    return results.reduce((targets, result) => {
         if (result.matches.length === 1) {
             targets.push(mergeTables(result.table, result.matches[0]))
         } else if (result.matches.length === 1) {
@@ -152,9 +160,6 @@ const oldMain = function(args) {
         }
         return targets
     }, [])
-
-    writeXml(constructRom(rrDefs, rrRom, targetRom, targetTables), args.target)
-    console.info('Matched and saved', targetTables.length, 'definitions to', args.target)
 }
 
 const readBytes = function(buf, offset, numBytes) {
@@ -235,22 +240,45 @@ const matchSubTables = function(rootTable, matchMap, bufA, bufB) {
 const main = function(args) {
     const rrDefs = readXml(args.source)
     const rrRom = readFirstRom(rrDefs)
+    const srRom = readFirstRom(readXml(args.source_sr))
+    const targetRom = readFirstRom(readXml(args.target_sr))
+
+    const targetTablesA = compareScoobyRomTables(rrRom, srRom, targetRom)
+
+    const rrRomTableUnk = rrRom.table.filter(table => {
+        return !targetTablesA.find(targetTable => {
+            return targetTable.attr.name === table.attr.name
+        })
+    })
 
     const srcBin = fs.readFileSync(args.source_rom)
     const targetBin = fs.readFileSync(args.target_rom)
+    const targetTablesB = compareRomAddresses(rrRomTableUnk, srcBin, targetBin)
 
+    const targetTables = [...targetTablesA, ...targetTablesB]
+    const targetTablesOrdered = rrRom.table.reduce((tables, srcTable) => {
+        const target = targetTables.find(target => target.attr.name === srcTable.attr.name)
+        if (target) {
+            tables.push(target)
+        }
+        return tables
+    }, [])
+    console.info('Wrote', targetTablesOrdered.length, 'definitions to', args.target)
+    writeXml(constructRom(rrDefs, rrRom, targetTablesOrdered), args.target)
+}
+
+const compareRomAddresses = function(rrRomTable, srcBin, targetBin) {
     // Find the shortest unique matching address range in the target bin for all
     // known source address
     const matchMap = {}
-    for (let table of rrRom.table) {
+    for (let table of rrRomTable) {
         const window = shortestUniqueWindowHelper(table, srcBin, targetBin)
         matchMap[table.attr.storageaddress] = window
         if (window.match > -1 && table.table) {
             matchSubTables(table.table, matchMap, srcBin, targetBin)
         }
     }
-
-    const targetTables = rrRom.table.reduce((acc, table) => {
+    return rrRomTable.reduce((acc, table) => {
         const targetTable = { ...table }
         const srcAddr = table.attr.storageaddress
         const window = matchMap[srcAddr]
@@ -268,8 +296,6 @@ const main = function(args) {
         }
         return acc
     }, [])
-
-    writeXml(constructRom(rrDefs, rrRom, targetTables), args.target)
 }
 
 if (require.main === module) {
@@ -282,13 +308,19 @@ if (require.main === module) {
         ['--source'], { help: 'Source RomRaider XML definitions', defaultValue: './data/RR_EA1T400W.xml' }
     )
     parser.addArgument(
+        ['--source-sr'], { help: 'Source ScoobyRom RomRaider XML maps', defaultValue: './data/SR-RR_EA1T400W.xml' }
+    )
+    parser.addArgument(
         ['--source-rom'], { help: 'Source binary ROM file', defaultValue: './roms/EA1T400W.bin' }
     )
     parser.addArgument(
-        ['--target-rom'], { help: 'Target binary ROM file', defaultValue: './roms/EA1M511A.bin' }
+        ['--target'], { help: 'Target RomRaider XML definitions', defaultValue: './data/RR_EA1M511A.xml' }
     )
     parser.addArgument(
-        ['--target'], { help: 'Target RomRaider XML definitions', defaultValue: './data/RR_EA1M511A.xml' }
+        ['--target-sr'], { help: 'Target ScoobyRom RomRaider XML maps', defaultValue: './data/SR-RR_EA1M511A.xml' }
+    )
+    parser.addArgument(
+        ['--target-rom'], { help: 'Target binary ROM file', defaultValue: './roms/EA1M511A.bin' }
     )
     const args = parser.parseArgs()
     console.info(`=== ${config.get('app:name')} ===`)
