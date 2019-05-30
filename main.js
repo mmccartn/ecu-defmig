@@ -1,96 +1,13 @@
 #!/usr/bin/env node
 
 const { ArgumentParser } = require('argparse')
+const compareRomAddresses = require('./src/hex-match.js')
+const compareScoobyRomTables = require('./src/table-match.js')
 const config = require('./config')
 const convert = require('xml-js')
 const fs = require('fs')
 
-const TABLE_IGNORES = new Set(['name', 'storageaddress'])
-const SCALE_IGNORES = new Set()
-
-const trimHex = function(str) {
-    return str[0] === '0' && str[1] === 'x' ? str.substring(2) : str
-}
-
-const compareSrTables = function(tableA, tableB) {
-    if (
-        tableA._comment === tableB._comment &&
-        compareElements(tableA, tableB, TABLE_IGNORES) &&
-        compareElements(tableA.scaling, tableB.scaling, SCALE_IGNORES)
-    ) {
-        const subTablesA = tableA.table
-        const subTablesB = tableB.table
-        if (!subTablesA && !subTablesB) { // Neither has sub-tables
-            return true
-        } else if ( // Missmatch
-            ((subTablesA && !subTablesB) || (!subTablesA && subTablesB)) ||
-            ((subTablesA && subTablesB) && subTablesA.length !== subTablesB.length)
-        ) {
-            return false
-        } else if (!subTablesA.length && !subTablesB.length) { // Both are objects
-            return compareSrTables(subTablesA, subTablesB)
-        } else { // Both have arrays of sub-tables
-            for (let idx in subTablesA) {
-                if (!compareSrTables(subTablesA[idx], subTablesB[idx])) {
-                    return false
-                }
-            }
-            return true
-        }
-    }
-    return false
-}
-
-const compareElements = function(elementA, elementB, ignore) {
-    for (let attr of Object.keys(elementA.attr)) {
-        if (!ignore.has(attr) && elementB.attr[attr] !== elementA.attr[attr]) {
-            return false
-        }
-    }
-    return true
-}
-
-const matchSourceToTarget = function(rrRom, srRom, srcMap, targetRom) {
-    return Object.keys(srcMap).reduce((results, srcIdx) => {
-        const table = rrRom.table[srcIdx]
-        const srTable = srRom.table[srcMap[srcIdx]]
-        const matches = targetRom.table.filter(tTable => {
-            return compareSrTables(srTable, tTable)
-        })
-        results.push({ table, matches })
-        return results
-    }, [])
-}
-
-const mergeTables = function(tableA, tableB) {
-    const clone = { ...tableA }
-    clone.attr.storageaddress = trimHex(tableB.attr.storageaddress)
-    if (clone.table && tableB.table) {
-        clone.table = clone.table.length ? clone.table : [clone.table]
-        tableB.table = tableB.table.length ? tableB.table : [tableB.table]
-        for (let idx in clone.table) {
-            clone.table[idx] = mergeTables(clone.table[idx], tableB.table[idx])
-        }
-    }
-    return clone
-}
-
-const matchMultipleByOrder = function(srRom, srcMap, rrRom, rrTable, matches) {
-    const srTable = srRom.table[srcMap[rrRom.table.indexOf(rrTable)]]
-    const srcOrder = srRom.table.filter(table => {
-        return compareSrTables(srTable, table)
-    })
-    if (matches.length === srcOrder.length) {
-        return matches[
-            srcOrder.map(match => trimHex(match.attr.storageaddress))
-                .indexOf(rrTable.attr.storageaddress)
-        ]
-    } else {
-        return false
-    }
-}
-
-const constructRom = function(rrDefs, rrRom, targetRom, targetTables) {
+const constructRom = function(rrDefs, rrRom, targetTables) {
     return {
         _declaration: rrDefs._declaration,
         _comment: rrDefs._comment,
@@ -98,26 +15,13 @@ const constructRom = function(rrDefs, rrRom, targetRom, targetTables) {
             rom: [
                 {
                     attr: rrRom.attr,
-                    romid: targetRom.romid,
+                    romid: rrRom.romid,
                     table: targetTables
                 },
                 rrDefs.roms.rom[1]
             ]
         }
     }
-}
-
-const mapRrToSr = function(rrRom, srRom) {
-    return rrRom.table.reduce((lookup, table, idx) => {
-        const storeAddr = trimHex(table.attr.storageaddress)
-        const match = srRom.table.findIndex(entry => {
-            return trimHex(entry.attr.storageaddress) === storeAddr
-        })
-        if (match !== -1) {
-            lookup[idx] = match
-        }
-        return lookup
-    }, {})
 }
 
 const writeXml = function(obj, filepath) {
@@ -138,31 +42,30 @@ const main = function(args) {
     const rrDefs = readXml(args.source)
     const rrRom = readFirstRom(rrDefs)
     const srRom = readFirstRom(readXml(args.source_sr))
-    const srcMap = mapRrToSr(rrRom, srRom)
     const targetRom = readFirstRom(readXml(args.target_sr))
 
-    const results = matchSourceToTarget(rrRom, srRom, srcMap, targetRom)
+    const targetTablesA = compareScoobyRomTables(rrRom, srRom, targetRom)
 
-    const targetTables = results.reduce((targets, result) => {
-        if (result.matches.length === 1) {
-            targets.push(mergeTables(result.table, result.matches[0]))
-        } else if (result.matches.length === 1) {
-            console.error('No matches found for', result.table.attr.name)
-        } else {
-            console.warn('Multiple matches for', result.table.attr.name,
-                result.matches.map(match => match.attr.storageaddress))
-            const match = matchMultipleByOrder(srRom, srcMap, rrRom, result.table, result.matches)
-            if (match) {
-                targets.push(mergeTables(result.table, match))
-            } else {
-                console.warn('* Could not find matching table from multiple choice by order')
-            }
+    const rrRomTableUnk = rrRom.table.filter(table => {
+        return !targetTablesA.find(targetTable => {
+            return targetTable.attr.name === table.attr.name
+        })
+    })
+
+    const srcBin = fs.readFileSync(args.source_rom)
+    const targetBin = fs.readFileSync(args.target_rom)
+    const targetTablesB = compareRomAddresses(rrRomTableUnk, srcBin, targetBin)
+
+    const targetTables = [...targetTablesA, ...targetTablesB]
+    const targetTablesOrdered = rrRom.table.reduce((tables, srcTable) => {
+        const target = targetTables.find(target => target.attr.name === srcTable.attr.name)
+        if (target) {
+            tables.push(target)
         }
-        return targets
+        return tables
     }, [])
-
-    writeXml(constructRom(rrDefs, rrRom, targetRom, targetTables), args.target)
-    console.info('Matched and saved', targetTables.length, 'definitions to', args.target)
+    console.info('Wrote', targetTablesOrdered.length, 'definitions to', args.target)
+    writeXml(constructRom(rrDefs, rrRom, targetTablesOrdered), args.target)
 }
 
 if (require.main === module) {
@@ -178,10 +81,16 @@ if (require.main === module) {
         ['--source-sr'], { help: 'Source ScoobyRom RomRaider XML maps', defaultValue: './data/SR-RR_EA1T400W.xml' }
     )
     parser.addArgument(
-        ['--target'], { help: 'Target RomRaider XML definitions to generate', defaultValue: './data/RR_EA1M511A.xml' }
+        ['--source-rom'], { help: 'Source binary ROM file', defaultValue: './roms/EA1T400W.bin' }
+    )
+    parser.addArgument(
+        ['--target'], { help: 'Target RomRaider XML definitions', defaultValue: './data/RR_EA1M511A.xml' }
     )
     parser.addArgument(
         ['--target-sr'], { help: 'Target ScoobyRom RomRaider XML maps', defaultValue: './data/SR-RR_EA1M511A.xml' }
+    )
+    parser.addArgument(
+        ['--target-rom'], { help: 'Target binary ROM file', defaultValue: './roms/EA1M511A.bin' }
     )
     const args = parser.parseArgs()
     console.info(`=== ${config.get('app:name')} ===`)
