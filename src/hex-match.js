@@ -96,8 +96,8 @@ module.exports = function(rrRomTable, srcBin, targetBin) {
         const targetTable = { ...table }
         const srcAddr = table.attr.storageaddress
         const window = matchMap[srcAddr]
-        const targetAddr = window.match
-        if (targetAddr > -1) {
+        if (window && window.match > -1) {
+            const targetAddr = window.match
             targetTable.attr.storageaddress = targetAddr.toString(16).toUpperCase()
             if (targetTable.table) {
                 targetTable.table = targetTable.table.length ? targetTable.table : [targetTable.table]
