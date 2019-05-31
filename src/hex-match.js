@@ -21,11 +21,11 @@ const readBytes = function(buf, offset, numBytes) {
 // -1: value not found in buf
 // -2: value found at least 2 times in buf
 // 0+: index of value in buf
-const indexOfSingle = function(buf, value, start = 0) {
-    const offset = buf.indexOf(value, start)
+const indexOfSingle = function(buf, value) {
+    const offset = buf.indexOf(value)
     if (offset === -1) {
         return -1
-    } else if (buf.indexOf(value, value.length + offset + start) === -1) {
+    } else if (buf.indexOf(value, value.length + offset) === -1) {
         return offset
     } else {
         return -2
