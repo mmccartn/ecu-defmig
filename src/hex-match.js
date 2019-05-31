@@ -39,7 +39,7 @@ const shortestUniqueWindow = function(key, start, len, bufA, bufB, tried, limit 
     if (index === -1) { // found no match
         return { match: -1, len: Infinity, offset: 0 }
     } else if (index !== -2) { // found unique match
-        return { match: index + (key - start), len, offset: (key - start) }
+        return { match: index + (key - start), len, offset: key - start }
     } else if (len >= limit) { // search depth limit
         return { match: -4, len, offset: 0 }
     } else { // found match, but not unique
